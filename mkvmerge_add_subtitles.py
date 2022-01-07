@@ -6,7 +6,7 @@ import glob
 import argparse
 # import configparser
 import logging
-import logging.config
+from datetime import datetime
 import subprocess
 from termcolor import colored
 
@@ -57,40 +57,43 @@ if __name__ == '__main__':
             fileHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             logger.addHandler(fileHandler)
 
+        file_list = []
         for movie_extension in args.extensions:
-            
             file_pattern = "*.%s"  % movie_extension
             if args.recursive:
                 file_pattern = "**/%s" % file_pattern
 
-            for filepath in glob.glob(file_pattern, recursive=args.recursive):
-                logging.debug("%s" % filepath)
-                filepath_without_ext = os.path.splitext(filepath)[0]
+            file_list += glob.glob(file_pattern, recursive=args.recursive)
 
-                subtitle_list = {}
+        for filepath in sorted(file_list):
+            logging.debug("%s" % filepath)
+            filepath_without_ext = os.path.splitext(filepath)[0]
 
-                for subtitle_extension in default_subtitle_extensions:
-                    subtitle_file_pattern = "%s.*.%s" % (filepath_without_ext, subtitle_extension)
-                    for subtitle_filepath in glob.glob(subtitle_file_pattern):
-                        m = re.match("%s.([a-z]{2,3}).%s" % (filepath_without_ext, subtitle_extension), subtitle_filepath)
-                        if (m):
-                            lang = m.group(1)
-                            logging.debug("subtitle found : %s (lang=%s)" % (subtitle_filepath, lang))
-                            subtitle_list[lang] = subtitle_filepath
+            subtitle_list = {}
 
-                if len(subtitle_list) > 0:
-                    print(colored(f"# found {filepath}", "yellow"))
+            for subtitle_extension in default_subtitle_extensions:
+                subtitle_file_pattern = "%s.*.%s" % (glob.escape(filepath_without_ext), subtitle_extension)
+                for subtitle_filepath in glob.glob(subtitle_file_pattern):
+                    logging.debug("found file: %s" % subtitle_filepath)
+                    m = re.match(r"%s.([a-z]{2,3}).%s" % (re.escape(filepath_without_ext), subtitle_extension), subtitle_filepath)
+                    if (m):
+                        lang = m.group(1)
+                        logging.debug("subtitle found : %s (lang=%s)" % (subtitle_filepath, lang))
+                        subtitle_list[lang] = subtitle_filepath
 
-                    output_file = filepath_without_ext + ".mux.mkv"
+            if len(subtitle_list) > 0:
+                print(colored(f"# found {filepath}", "yellow"))
 
-                    command = [ "mkvmerge", "-o", f"{filepath_without_ext}.MUX.mkv", filepath ]
-                    for (lang, subtitle_filepath) in subtitle_list.items():
-                        command += [ "--language", f"0:{lang}", subtitle_filepath ]
-                        print(f"found subtitle {subtitle_filepath} (lang: {lang})")
+                output_file = filepath_without_ext + ".mux.mkv"
 
-                    print(f"generating {output_file}")
-                    logging.debug(f"executing command: {command}")
-                    p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)
+                command = [ "mkvmerge", "-o", f"{filepath_without_ext}.MUX.mkv", filepath ]
+                for (lang, subtitle_filepath) in subtitle_list.items():
+                    command += [ "--language", f"0:{lang}", subtitle_filepath ]
+                    print(f"found subtitle {subtitle_filepath} (lang: {lang})")
+
+                print(f"generating {output_file}")
+                logging.debug(f"executing command: {command}")
+                p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)
         
     # catch keyboard interrupt or broken pipe
     except (KeyboardInterrupt) as e:
