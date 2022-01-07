@@ -98,7 +98,7 @@ if __name__ == '__main__':
                             os.rename(subtitle_output_file, subtitle_filepath)
 
         
-    # catch keyborad interrupt or broken pipe
+    # catch keyboard interrupt or broken pipe
     except (KeyboardInterrupt) as e:
         print("\ninterrupted")
         try:

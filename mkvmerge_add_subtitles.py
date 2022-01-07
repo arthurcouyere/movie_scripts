@@ -92,7 +92,7 @@ if __name__ == '__main__':
                     logging.debug(f"executing command: {command}")
                     p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)
         
-    # catch keyborad interrupt or broken pipe
+    # catch keyboard interrupt or broken pipe
     except (KeyboardInterrupt) as e:
         print("\ninterrupted")
         try:

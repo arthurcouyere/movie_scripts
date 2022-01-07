@@ -7,8 +7,7 @@ import sys
 import glob
 import argparse
 import logging
-# import logging.config
-# import datetime
+from datetime import datetime
 import requests
 import json
 from fuzzywuzzy import fuzz
@@ -164,14 +163,14 @@ if __name__ == '__main__':
         else:
             logLevel = logging.INFO            
         logging.basicConfig(stream=sys.stdout, level=logLevel, format='%(asctime)s - %(levelname)s - %(message)s')
-        # logger = logging.getLogger()
+        logger = logging.getLogger()
 
-        # if args.log:
-        #     logFile = "%s_%s.log" % (script_name, datetime.now().strftime('%Y%m%d_%H%M%S'))
-        #     fileHandler = logging.FileHandler(logFile)
-        #     fileHandler.setLevel(logging.INFO)
-        #     fileHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        #     logger.addHandler(fileHandler)
+        if args.log:
+            logFile = "%s_%s.log" % (script_name, datetime.now().strftime('%Y%m%d_%H%M%S'))
+            fileHandler = logging.FileHandler(logFile)
+            fileHandler.setLevel(logging.INFO)
+            fileHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            logger.addHandler(fileHandler)
 
         file_list = []
         for movie_extension in args.extensions:
@@ -189,11 +188,14 @@ if __name__ == '__main__':
             logging.debug("title: [%s] year: %s" % (title, year))
 
             content_list = search_content(query = title, content_type_list = ["movie"])
+            content_found = False
 
             for content in content_list:
                 logging.debug("found: %s" % str(content))
                 if len(content.provider_list) > 0:
-                    tqdm.write("%s:" % (filepath))
+                    if not content_found:
+                        tqdm.write("%s:" % (filepath))
+                        content_found = True
 
                     if (year != None) and (year == content.release_year):
                         color = "green"
