@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-# from justwatch import JustWatch
 import os
 import re
 import sys
@@ -18,10 +17,12 @@ from tqdm import tqdm
 # configuration
 ############################
 
+search_url = "https://apis.justwatch.com/content/titles/fr_FR/popular"
+default_language = "fr"
 default_movie_extensions = [ "mkv", "mp4", "avi" ]
 default_min_fuzz_ratio = 70
 default_content_type_list = ["show", "movie"]
-monetization_type_list = ["flatrate", "free"]
+default_monetization_type_list = ["flatrate", "free"]
 default_provider_list = ["nfx", "prv", "dnp"]
 provider_names = {
     "nfx": "Netflix",
@@ -40,17 +41,20 @@ provider_names = {
 
 class Content():
     title = None
+    type = None
     release_year = None
     ratio = None
     provider_list = []
 
     def __init__(self, 
         title: str,
+        type: str,
         ratio: int,
         release_year: int = None,
         provider_list: list = None
     ):
         self.title = title
+        self.type = type
         self.ratio = ratio
         if release_year != None:
             self.release_year = release_year 
@@ -59,7 +63,7 @@ class Content():
 
     def __str__(self) -> str:
         providers = [ provider_names[p] for p in self.provider_list]
-        return "%s (%s) [ratio: %s] -> %s" % (self.title, self.release_year, self.ratio, ", ".join(providers))
+        return "%s (%s) [%s] [ratio: %s] -> %s" % (self.title, self.release_year, self.type, self.ratio, ", ".join(providers))
 
 ############################
 # functions
@@ -84,7 +88,10 @@ def get_title_year_from_filename(filename: str) -> tuple:
 
     return (title, year)
 
-def search_content(query: str, content_type_list: list = None, min_fuzz_ratio: int = None) -> list:
+def search_content(query: str, language: str = None, content_type_list: list = None, min_fuzz_ratio: int = None) -> list:
+
+    if language == None:
+        language = default_language
 
     if content_type_list == None:
         content_type_list = default_content_type_list
@@ -95,7 +102,7 @@ def search_content(query: str, content_type_list: list = None, min_fuzz_ratio: i
     body = {
         "query": query,
         "content_types": content_type_list,
-        "monetization_types": monetization_type_list,
+        "monetization_types": default_monetization_type_list,
         "providers": default_provider_list,
         "enable_provider_filter": True,
         "matching_offers_only": True,
@@ -105,14 +112,11 @@ def search_content(query: str, content_type_list: list = None, min_fuzz_ratio: i
     }
 
     payload = {
-        "language": "en",
+        "language": language,
         "body": json.dumps(body)
     }
 
-    # print(payload)
-
-    url = 'https://apis.justwatch.com/content/titles/fr_FR/popular'
-    r = requests.get(url, params=payload)
+    r = requests.get(search_url, params=payload)
 
     if r.status_code != 200:
         raise Exception(f"ERROR {r.status_code}: {r.content}")
@@ -128,7 +132,7 @@ def search_content(query: str, content_type_list: list = None, min_fuzz_ratio: i
 
             provider_list = []
             for offer in search_result["offers"]:
-                if offer["monetization_type"] in monetization_type_list \
+                if offer["monetization_type"] in default_monetization_type_list \
                     and offer["package_short_name"] in default_provider_list \
                     and offer["package_short_name"] not in provider_list :
                     provider_list.append(offer["package_short_name"])
@@ -136,6 +140,7 @@ def search_content(query: str, content_type_list: list = None, min_fuzz_ratio: i
             content = Content(
                 title = search_result["title"],
                 ratio = ratio,
+                type = search_result["object_type"],
                 release_year = search_result["original_release_year"],
                 provider_list = provider_list
             )
@@ -154,8 +159,10 @@ if __name__ == '__main__':
 
         # options
         parser = argparse.ArgumentParser(description='automatic providers search')
-        parser.add_argument('extensions', nargs="*", help='movie file extensions')
-        parser.add_argument('-m', '--min-ratio',  metavar='min_ratio', type=int, help='minimun fuzz radio (default=%s)' % default_min_fuzz_ratio)
+        parser.add_argument('extensions', nargs="*", help='movie file extensions (default=%s)' % str(default_movie_extensions))
+        parser.add_argument('-m', '--min-ratio',  metavar='min_ratio', type=int,  help='minimun fuzz radio (default=%s)' % default_min_fuzz_ratio)
+        parser.add_argument('-g', '--lang',       metavar='lang',      type=str,  help='language for search (default=%s)' % default_language)
+        parser.add_argument('-t', '--types',      metavar='types',     nargs="+", help='content types for search (default=%s)' % str(default_content_type_list))
         parser.add_argument('-y', '--year-match', dest='year_match', action='store_true', help='display only content matching year')
         parser.add_argument('-a', '--all',        dest='all',        action='store_true', help='display all files, even if no content found')
         parser.add_argument('-r', '--recursive',  dest='recursive',  action='store_true', help='recurse in sub folders')
@@ -196,16 +203,22 @@ if __name__ == '__main__':
             (title, year) = get_title_year_from_filename(filepath_without_ext)
             logging.debug("title: [%s] year: %s" % (title, year))
 
-            content_list = search_content(query = title, content_type_list = ["movie"], min_fuzz_ratio = args.min_ratio)
+            content_list = search_content(query = title, language= args.lang, content_type_list = args.types, min_fuzz_ratio = args.min_ratio)
 
             output = ""
 
             for content in content_list:
                 logging.debug("found: %s" % str(content))
                 if len(content.provider_list) > 0:
-
-                    year_matches = (year != None) and (year == content.release_year)
-                    color = "green" if year_matches else "yellow"
+                    
+                    year_matches = False
+                    if year == None:
+                        color = "cyan"
+                    elif year == content.release_year:
+                        year_matches = True
+                        color = "green"
+                    else:
+                        color = "yellow"
                     
                     if year_matches or not args.year_match:
                         output += colored("\t" + str(content) + "\n", color)
