@@ -13,6 +13,7 @@ import requests
 import json
 from fuzzywuzzy import fuzz
 from termcolor import colored
+from tqdm import tqdm
 
 ############################
 # configuration
@@ -66,6 +67,9 @@ class Content():
 ############################
 
 def get_title_year_from_filename(filename: str) -> tuple:
+    filename = os.path.basename(filename)
+
+    # default values
     title = filename
     year = None
 
@@ -169,32 +173,34 @@ if __name__ == '__main__':
         #     fileHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         #     logger.addHandler(fileHandler)
 
+        file_list = []
         for movie_extension in args.extensions:
-            
             file_pattern = "*.%s"  % movie_extension
             if args.recursive:
                 file_pattern = "**/%s" % file_pattern
 
-            for filepath in sorted(glob.glob(file_pattern, recursive=args.recursive)):
-                logging.debug("%s" % filepath)
-                filepath_without_ext = os.path.splitext(filepath)[0]
+            file_list += glob.glob(file_pattern, recursive=args.recursive)
 
-                (title, year) = get_title_year_from_filename(filepath_without_ext)
-                logging.debug("title: [%s] year: %s" % (title, year))
+        for filepath in tqdm(sorted(file_list)):
+            logging.debug("%s" % filepath)
+            filepath_without_ext = os.path.splitext(filepath)[0]
 
-                content_list = search_content(query = title, content_type_list = ["movie"])
+            (title, year) = get_title_year_from_filename(filepath_without_ext)
+            logging.debug("title: [%s] year: %s" % (title, year))
 
-                for content in content_list:
-                    logging.debug("found: %s" % str(content))
-                    if len(content.provider_list) > 0:
-                        print("%s:" % (filepath))
+            content_list = search_content(query = title, content_type_list = ["movie"])
 
-                        if (year != None) and (year == content.release_year):
-                            color = "green"
-                        else:
-                            color = "yellow"
+            for content in content_list:
+                logging.debug("found: %s" % str(content))
+                if len(content.provider_list) > 0:
+                    tqdm.write("%s:" % (filepath))
 
-                        print(colored("\t" + str(content), color))
+                    if (year != None) and (year == content.release_year):
+                        color = "green"
+                    else:
+                        color = "yellow"
+
+                    tqdm.write(colored("\t" + str(content), color))
                 
     # catch keyboard interrupt or broken pipe
     except (KeyboardInterrupt) as e:
