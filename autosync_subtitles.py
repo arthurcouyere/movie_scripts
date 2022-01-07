@@ -6,11 +6,11 @@ import glob
 import argparse
 # import configparser
 import logging
-import logging.config
+from datetime import datetime
 import subprocess
 from termcolor import colored
-import autosubsync
-# import ffsubsync
+# import autosubsync
+import ffsubsync
 
 ############################
 # configuration
@@ -59,43 +59,46 @@ if __name__ == '__main__':
             fileHandler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             logger.addHandler(fileHandler)
 
+        file_list = []
         for movie_extension in args.extensions:
-            
             file_pattern = "*.%s"  % movie_extension
             if args.recursive:
                 file_pattern = "**/%s" % file_pattern
 
-            for filepath in glob.glob(file_pattern, recursive=args.recursive):
-                logging.debug("%s" % filepath)
-                filepath_without_ext = os.path.splitext(filepath)[0]
+            file_list += glob.glob(file_pattern, recursive=args.recursive)
 
-                subtitle_list = {}
+        for filepath in sorted(file_list):
+            logging.debug("%s" % filepath)
+            filepath_without_ext = os.path.splitext(filepath)[0]
 
-                for subtitle_extension in default_subtitle_extensions:
-                    subtitle_file_pattern = "%s.*.%s" % (filepath_without_ext, subtitle_extension)
-                    for subtitle_filepath in glob.glob(subtitle_file_pattern):
-                        m = re.match("%s.([a-z]{2,3}).%s" % (filepath_without_ext, subtitle_extension), subtitle_filepath)
-                        if (m):
-                            lang = m.group(1)
-                            logging.debug("subtitle found : %s (lang=%s)" % (subtitle_filepath, lang))
-                            subtitle_list[lang] = subtitle_filepath
+            subtitle_list = {}
 
-                if len(subtitle_list) > 0:
-                    output_file = filepath_without_ext + ".mux.mkv"
+            for subtitle_extension in default_subtitle_extensions:
+                subtitle_file_pattern = "%s.*.%s" % (glob.escape(filepath_without_ext), subtitle_extension)
+                for subtitle_filepath in glob.glob(subtitle_file_pattern):
+                    logging.debug("found file: %s" % subtitle_filepath)
+                    m = re.match(r"%s.([a-z]{2,3}).%s" % (re.escape(filepath_without_ext), subtitle_extension), subtitle_filepath)
+                    if (m):
+                        lang = m.group(1)
+                        logging.debug("subtitle found : %s (lang=%s)" % (subtitle_filepath, lang))
+                        subtitle_list[lang] = subtitle_filepath
 
-                    for (lang, subtitle_filepath) in subtitle_list.items():
-                        (subtitle_filepath_without_ext, subtitle_extension) = os.path.splitext(subtitle_filepath)
-                        subtitle_output_file = subtitle_filepath_without_ext + ".synced" + subtitle_extension
+            if len(subtitle_list) > 0:
+                output_file = filepath_without_ext + ".mux.mkv"
 
-                        print(colored(f"# syncing {subtitle_filepath}", "yellow"))
+                for (lang, subtitle_filepath) in subtitle_list.items():
+                    (subtitle_filepath_without_ext, subtitle_extension) = os.path.splitext(subtitle_filepath)
+                    subtitle_output_file = subtitle_filepath_without_ext + ".synced" + subtitle_extension
 
-                        command = [ "ffs", filepath, "-i", subtitle_filepath, "-o", subtitle_output_file ]
-                        autosubsync.synchronize(filepath, subtitle_filepath, subtitle_output_file)
-                        logging.debug(f"executing command: {command}")
-                        p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)                        
-                        if (os.path.exists(subtitle_output_file)):
-                            os.rename(subtitle_filepath, subtitle_filepath + ".old")
-                            os.rename(subtitle_output_file, subtitle_filepath)
+                    print(colored(f"# syncing {subtitle_filepath}", "yellow"))
+
+                    # autosubsync.synchronize(filepath, subtitle_filepath, subtitle_output_file)
+                    command = [ "ffs", filepath, "-i", subtitle_filepath, "-o", subtitle_output_file ]
+                    logging.debug(f"executing command: {command}")
+                    p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)                        
+                    if (os.path.exists(subtitle_output_file)):
+                        os.rename(subtitle_filepath, subtitle_filepath + ".old")
+                        os.rename(subtitle_output_file, subtitle_filepath)
 
         
     # catch keyboard interrupt or broken pipe
