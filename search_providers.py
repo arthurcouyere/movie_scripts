@@ -21,7 +21,7 @@ search_url = "https://apis.justwatch.com/content/titles/fr_FR/popular"
 default_language = "fr"
 default_movie_extensions = [ "mkv", "mp4", "avi" ]
 default_min_fuzz_ratio = 70
-default_content_type_list = ["show", "movie"]
+default_content_type_list = ["movie"]
 default_monetization_type_list = ["flatrate", "free"]
 default_provider_list = ["nfx", "prv", "dnp"]
 provider_names = {
@@ -126,16 +126,22 @@ def search_content(query: str, language: str = None, content_type_list: list = N
     content_list = []
     
     for search_result in search_result_list:
-        
-        ratio = fuzz.ratio(search_result["title"], query.lower())            
+             
+        logging.debug("search result : %s (%s) [%s]" % (search_result["title"], search_result["original_release_year"], search_result["object_type"]))
+
+        ratio = fuzz.ratio(search_result["title"], query.lower())
+        logging.debug("fuzz ratio=%s" % ratio)
         if ratio >= min_fuzz_ratio:
+            logging.debug("[content found] ratio of %s >= %s" % (ratio, min_fuzz_ratio))
 
             provider_list = []
             for offer in search_result["offers"]:
                 if offer["monetization_type"] in default_monetization_type_list \
                     and offer["package_short_name"] in default_provider_list \
                     and offer["package_short_name"] not in provider_list :
-                    provider_list.append(offer["package_short_name"])
+                    provider = offer["package_short_name"]
+                    provider_list.append(provider)
+                    logging.debug("[provider] %s" % provider)
             
             content = Content(
                 title = search_result["title"],
@@ -146,6 +152,8 @@ def search_content(query: str, language: str = None, content_type_list: list = N
             )
 
             content_list.append(content)
+        else:
+            logging.debug("[skipped] ratio of %s < %s" % (ratio, min_fuzz_ratio))
 
     return content_list
             
@@ -162,7 +170,7 @@ if __name__ == '__main__':
         parser.add_argument('extensions', nargs="*", help='movie file extensions (default=%s)' % str(default_movie_extensions))
         parser.add_argument('-m', '--min-ratio',  metavar='min_ratio', type=int,  help='minimun fuzz radio (default=%s)' % default_min_fuzz_ratio)
         parser.add_argument('-g', '--lang',       metavar='lang',      type=str,  help='language for search (default=%s)' % default_language)
-        parser.add_argument('-t', '--types',      metavar='types',     nargs="+", help='content types for search (default=%s)' % str(default_content_type_list))
+        parser.add_argument('-t', '--types',      metavar='types',     nargs="+", help='content types for search : movie, show (default=%s)' % str(default_content_type_list))
         parser.add_argument('-y', '--year-match', dest='year_match', action='store_true', help='display only content matching year')
         parser.add_argument('-a', '--all',        dest='all',        action='store_true', help='display all files, even if no content found')
         parser.add_argument('-r', '--recursive',  dest='recursive',  action='store_true', help='recurse in sub folders')
