@@ -81,7 +81,7 @@ if __name__ == '__main__':
             command = [ "mkvmerge", "-o", f"{filepath_without_ext}.MUX.mkv", "--audio-tracks", languages_list, "--subtitle-tracks", languages_list, filepath ]
             print(f"generating {output_file}")
             logging.debug(f"executing command: {command}")
-            # p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)
+            p = subprocess.run(command, check=True, stdout=sys.stdout, stderr=sys.stderr)
         
     # catch keyboard interrupt or broken pipe
     except (KeyboardInterrupt) as e:
