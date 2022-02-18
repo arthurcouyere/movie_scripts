@@ -29,6 +29,14 @@ ffprobe_stream_types = {
 # functions
 ############################
 
+def lower_keys(x):
+    if isinstance(x, list):
+        return [lower_keys(v) for v in x]
+    elif isinstance(x, dict):
+        return dict((k.lower(), lower_keys(v)) for k, v in x.items())
+    else:
+        return x
+
 def ffprobe_get_stream_languages(filename: str, stream_type: str):
     stream_language_list = None
 
@@ -36,7 +44,7 @@ def ffprobe_get_stream_languages(filename: str, stream_type: str):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, cwd=os.getcwd())
     proc_output = proc.stdout.read()
     
-    ret = json.loads(proc_output)
+    ret = lower_keys(json.loads(proc_output))
 
     if "streams" in ret.keys():
         stream_language_list= []
